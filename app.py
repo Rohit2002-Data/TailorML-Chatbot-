@@ -1,4 +1,3 @@
-# TailorML - Enhanced with Gemini AI Performance-Aware Assistant
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,7 +20,7 @@ import time
 import google.generativeai as genai
 
 # ======== Configure Gemini AI ========
-genai.configure(api_key="YOUR_API_KEY")  # Replace with your Gemini API Key
+genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # Replace with your API key
 model = genai.GenerativeModel("gemini-2.0-flash")
 
 st.set_page_config(page_title="TailorML", page_icon="🧠", layout="centered")
@@ -71,15 +70,16 @@ def get_models(task_type):
             "AdaBoost Regressor": AdaBoostRegressor()
         }
 
-# ======== App State Initialization ========
-st.title(":brain: TailorML: Your Predictive Chat Assistant")
+# ======== App State ========
+st.title("🧠 TailorML: Your Predictive Chat Assistant")
+
 if "stage" not in st.session_state:
     st.session_state.stage = "start"
     st.session_state.df = None
 
-# ======== Upload Stage ========
+# ======== Stage: Upload ========
 if st.session_state.stage == "start":
-    st.chat_message("ai").write("\U0001f44b Hi, I’m **TailorML**! Let’s predict together. Start by uploading your dataset \U0001f4c2")
+    st.chat_message("ai").write("👋 Hi, I’m **TailorML**! Let’s predict together. Start by uploading your dataset 📂")
     file = st.file_uploader("Upload your CSV dataset", type=["csv"])
     if file:
         df = pd.read_csv(file)
@@ -88,17 +88,22 @@ if st.session_state.stage == "start":
         st.session_state.stage = "uploaded"
         st.rerun()
 
-# ======== Dataset Preview Stage ========
+# ======== Stage: Preview ========
 elif st.session_state.stage == "uploaded":
-    st.chat_message("ai").write("\U0001f440 Here's a preview of your dataset:")
+    st.chat_message("ai").write("👀 Here's a preview of your dataset:")
     st.dataframe(st.session_state.df.head())
-    st.chat_message("ai").write(f"\U0001f4d0 Shape: {st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
+    st.chat_message("ai").write(f"📐 Shape: {st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
+
+    missing_percent = (st.session_state.df.isnull().sum() / len(st.session_state.df) * 100).round(2)
+    if (missing_percent > 0).any():
+        st.chat_message("ai").write("🧹 Missing values (%):")
+        st.dataframe(missing_percent[missing_percent > 0])
 
     if st.button("✅ All Good, Next"):
         st.session_state.stage = "choose_target"
         st.rerun()
 
-# ======== Target Selection Stage ========
+# ======== Stage: Choose Target ========
 elif st.session_state.stage == "choose_target":
     st.chat_message("ai").write("🎯 What would you like to predict? Choose a target column:")
     target = st.selectbox("Select the target column", st.session_state.df.columns)
@@ -108,13 +113,15 @@ elif st.session_state.stage == "choose_target":
             st.session_state.stage = "predict"
             st.rerun()
 
-# ======== Model Training and Prediction Stage ========
+# ======== Stage: Predict ========
 elif st.session_state.stage == "predict":
     st.chat_message("ai").write("⚙️ Training ML models on your data...")
     time.sleep(1)
 
     df = st.session_state.df
     target = st.session_state.target
+    st.chat_message("ai").write(f"🎯 Target selected: **{target}**")
+
     X = df.drop(columns=[target])
     y = df[target]
 
@@ -124,6 +131,8 @@ elif st.session_state.stage == "predict":
         y = LabelEncoder().fit_transform(y)
 
     task_type = "classification" if y.dtype == 'object' or y.nunique() <= 10 else "regression"
+    st.chat_message("ai").write(f"📊 Task detected: **{task_type}**")
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
     models = get_models(task_type)
 
@@ -149,6 +158,14 @@ elif st.session_state.stage == "predict":
             results[name] = f"❌ {str(e)}"
         progress.progress((i + 1) / len(models))
 
+    explanation = {
+        "Random Forest": "🌲 Excellent for nonlinear data with lots of features.",
+        "Linear Regression": "📈 Great when the relationship between features and target is linear.",
+        "KNN": "👥 Works well for small datasets by looking at nearby points.",
+        "AdaBoost Classifier": "⚡ Boosts simple learners for better results.",
+        "Gradient Boosting Regressor": "🚀 Ideal for structured datasets with patterns."
+    }.get(best_model, "✨ A solid pick for your data!")
+
     st.session_state.update({
         "stage": "results",
         "results": results,
@@ -158,45 +175,121 @@ elif st.session_state.stage == "predict":
         "y_test": y_test,
         "y_pred": best_y_pred,
         "best_model_obj": best_model_obj,
+        "explanation": explanation,
         "X_train": X_train,
         "task_type": task_type
     })
     st.rerun()
 
-# ======== Results & Insights Stage ========
+# ======== Stage: Results ========
 elif st.session_state.stage == "results":
     st.chat_message("ai").write(f"🏅 Best model: **{st.session_state.best_model}** | Score: **{st.session_state.best_score:.2f}**")
-    st.chat_message("ai").write("📊 All model performances:")
+    st.chat_message("ai").write(f"🤖 Explanation: {st.session_state.explanation}")
+
+    st.chat_message("ai").write("📈 All model performances:")
     st.dataframe(pd.DataFrame.from_dict(st.session_state.results, orient='index', columns=['Score']))
 
-    # ======== Gemini Assistant with ML Context Awareness ========
-    user_input = st.chat_input("💬 Ask TailorML about models, performance, or concepts...")
-    if user_input:
-        st.chat_message("user").write(user_input)
-        model_perf = "\n".join([f"{k}: {v}" for k, v in st.session_state.results.items()]) if "results" in st.session_state else "No model scores available."
-        context = f"""
-        You are TailorML, a smart machine learning assistant.
+    df_preds = st.session_state.X_test.copy()
+    df_preds['Actual'] = st.session_state.y_test
+    df_preds['Predicted'] = st.session_state.y_pred
 
-        Dataset preview: {st.session_state.df.head(3).to_dict() if 'df' in st.session_state else 'Not loaded'}
-        Target: {st.session_state.get('target', 'N/A')}
-        Task: {st.session_state.get('task_type', 'Unknown')}
-        Best model: {st.session_state.get('best_model', 'N/A')} with score {st.session_state.get('best_score', 'N/A')}
-        Model performances:
-        {model_perf}
+    csv = df_preds.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Predictions", csv, "predictions.csv", "text/csv")
 
-        Respond clearly using this context if user asks about:
-        - model comparison
-        - predictions
-        - ML explanation (e.g., SHAP, LIME, F1-score)
-        - Why a model performed well
+    def generate_pdf_report(df, model_name, score, shap_fig=None, lime_fig=None, user_notes=None, lime_explanations=[]):
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
 
-        If user asks generic ML questions (like "What is overfitting?"), explain them too.
-        Now answer this:
-        '''{user_input}'''
-        """
-        try:
-            with st.spinner("TailorML is thinking... \U0001f914"):
-                response = model.generate_content(context)
-                st.chat_message("ai").write(response.text)
-        except Exception as e:
-            st.chat_message("ai").write(f"⚠️ Gemini couldn't respond: {e}")
+        pdf.cell(200, 10, txt="TailorML Prediction Report", ln=True, align="C")
+        pdf.ln(10)
+
+        pdf.cell(200, 10, txt=f"Best Model: {model_name}", ln=True)
+        pdf.cell(200, 10, txt=f"Model Score: {score:.4f}", ln=True)
+        pdf.ln(10)
+
+        if user_notes:
+            pdf.set_font("Arial", style="B", size=12)
+            pdf.cell(200, 10, txt="User Comments / Recommendations:", ln=True)
+            pdf.set_font("Arial", size=12)
+            pdf.multi_cell(0, 10, txt=user_notes)
+            pdf.ln(10)
+
+        pdf.cell(200, 10, txt="Sample Predictions:", ln=True)
+        for i in range(min(10, len(df))):
+            row = df.iloc[i]
+            row_str = ", ".join([f"{col}: {val}" for col, val in row.items()])
+            pdf.multi_cell(0, 10, txt=row_str)
+
+        if shap_fig:
+            shap_fig.savefig("shap_plot.png")
+            pdf.image("shap_plot.png", x=10, y=pdf.get_y(), w=180)
+            pdf.ln(85)
+
+        if lime_fig:
+            lime_fig.savefig("lime_plot.png")
+            pdf.image("lime_plot.png", x=10, y=pdf.get_y(), w=180)
+            pdf.ln(85)
+
+        for i, lime_fig_i in enumerate(lime_explanations):
+            lime_fig_i.savefig(f"lime_plot_{i}.png")
+            pdf.image(f"lime_plot_{i}.png", x=10, y=pdf.get_y(), w=180)
+            pdf.ln(85)
+
+        pdf.output("TailorML_Report.pdf")
+
+    if st.button("📄 Export PDF Report"):
+        generate_pdf_report(df_preds, st.session_state.best_model, st.session_state.best_score)
+        with open("TailorML_Report.pdf", "rb") as f:
+            st.download_button("⬇️ Download PDF Report", f, file_name="TailorML_Report.pdf")
+
+    if hasattr(st.session_state.best_model_obj, 'feature_importances_'):
+        st.subheader("🔍 Feature Importance")
+        importance_df = pd.DataFrame({
+            'Feature': st.session_state.X_train.columns,
+            'Importance': st.session_state.best_model_obj.feature_importances_
+        }).sort_values(by='Importance', ascending=False)
+        st.bar_chart(importance_df.set_index('Feature'))
+
+    try:
+        explainer = shap.Explainer(st.session_state.best_model_obj, st.session_state.X_train)
+        shap_values = explainer(st.session_state.X_test[:100])
+        st.subheader("🔬 SHAP Explanation Summary")
+        fig, ax = plt.subplots()
+        shap.summary_plot(shap_values, st.session_state.X_test[:100], show=False)
+        st.pyplot(fig)
+    except Exception as e:
+        st.warning(f"SHAP explanation skipped: {e}")
+
+    try:
+        st.subheader("💡 LIME Explanation (1st test instance)")
+        lime_explainer = lime.lime_tabular.LimeTabularExplainer(
+            training_data=np.array(st.session_state.X_train),
+            feature_names=st.session_state.X_train.columns.tolist(),
+            class_names=["output"],
+            mode=st.session_state.task_type
+        )
+        exp = lime_explainer.explain_instance(
+            st.session_state.X_test.iloc[0].values,
+            st.session_state.best_model_obj.predict,
+            num_features=10
+        )
+        fig = exp.as_pyplot_figure()
+        st.pyplot(fig)
+    except Exception as e:
+        st.warning(f"LIME explanation skipped: {e}")
+
+    if st.button("🔁 Try New Dataset"):
+        st.session_state.stage = "start"
+        st.rerun()
+
+# ======== Gemini Chat Assistant ========
+user_input = st.chat_input("💬 Ask TailorML about your results, ML models, or next steps...")
+if user_input:
+    st.chat_message("user").write(user_input)
+    try:
+        with st.spinner("TailorML is thinking... 🤔"):
+            response = model.generate_content(user_input)
+            st.chat_message("ai").write(response.text)
+    except Exception as e:
+        st.chat_message("ai").write(f"⚠️ Gemini couldn't process your query: {e}")
