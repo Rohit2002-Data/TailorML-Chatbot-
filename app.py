@@ -20,7 +20,7 @@ import time
 import google.generativeai as genai  # Gemini integration
 
 # === Gemini Configuration ===
-genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # <-- Replace with your key
+genai.configure(api_key="YOUR_GEMINI_API_KEY")  # Replace with your Gemini API key
 
 @st.cache_resource
 def get_gemini_chat():
@@ -190,8 +190,8 @@ elif st.session_state.stage == "predict":
 # === Stage: Results ===
 elif st.session_state.stage == "results":
     st.chat_message("ai").write(f"🏅 Best model: **{st.session_state.best_model}** | Score: **{st.session_state.best_score:.2f}**")
+    st.chat_message("ai").write(f"📊 Detected Task Type: **{st.session_state.task_type.title()}**")
     st.chat_message("ai").write(f"🤖 Explanation: {st.session_state.explanation}")
-
     st.chat_message("ai").write("📈 All model performances:")
     st.dataframe(pd.DataFrame.from_dict(st.session_state.results, orient='index', columns=['Score']))
 
@@ -202,7 +202,7 @@ elif st.session_state.stage == "results":
     csv = df_preds.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Download Predictions", csv, "predictions.csv", "text/csv")
 
-    def generate_pdf_report(df, model_name, score, shap_fig=None, lime_fig=None, user_notes=None, lime_explanations=[]):
+    def generate_pdf_report(df, model_name, score, task_type, shap_fig=None, lime_fig=None, user_notes=None, lime_explanations=[]):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
@@ -211,14 +211,8 @@ elif st.session_state.stage == "results":
 
         pdf.cell(200, 10, txt=f"Best Model: {model_name}", ln=True)
         pdf.cell(200, 10, txt=f"Model Score: {score:.4f}", ln=True)
+        pdf.cell(200, 10, txt=f"Task Type: {task_type.title()}", ln=True)
         pdf.ln(10)
-
-        if user_notes:
-            pdf.set_font("Arial", style="B", size=12)
-            pdf.cell(200, 10, txt="User Comments / Recommendations:", ln=True)
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, txt=user_notes)
-            pdf.ln(10)
 
         pdf.cell(200, 10, txt="Sample Predictions:", ln=True)
         for i in range(min(10, len(df))):
@@ -226,40 +220,17 @@ elif st.session_state.stage == "results":
             row_str = ", ".join([f"{col}: {val}" for col, val in row.items()])
             pdf.multi_cell(0, 10, txt=row_str)
 
-        if shap_fig:
-            shap_fig.savefig("shap_plot.png")
-            pdf.image("shap_plot.png", x=10, y=pdf.get_y(), w=180)
-            pdf.ln(85)
-
-        if lime_fig:
-            lime_fig.savefig("lime_plot.png")
-            pdf.image("lime_plot.png", x=10, y=pdf.get_y(), w=180)
-            pdf.ln(85)
-
-        for i, lime_fig_i in enumerate(lime_explanations):
-            lime_fig_i.savefig(f"lime_plot_{i}.png")
-            pdf.image(f"lime_plot_{i}.png", x=10, y=pdf.get_y(), w=180)
-            pdf.ln(85)
-
         pdf.output("TailorML_Report.pdf")
 
     if st.button("📄 Export PDF Report"):
-        generate_pdf_report(df_preds, st.session_state.best_model, st.session_state.best_score)
+        generate_pdf_report(df_preds, st.session_state.best_model, st.session_state.best_score, st.session_state.task_type)
         with open("TailorML_Report.pdf", "rb") as f:
             st.download_button("⬇️ Download PDF Report", f, file_name="TailorML_Report.pdf")
 
-    if hasattr(st.session_state.best_model_obj, 'feature_importances_'):
-        st.subheader("🔍 Feature Importance")
-        importance_df = pd.DataFrame({
-            'Feature': st.session_state.X_train.columns,
-            'Importance': st.session_state.best_model_obj.feature_importances_
-        }).sort_values(by='Importance', ascending=False)
-        st.bar_chart(importance_df.set_index('Feature'))
-
     try:
+        st.subheader("🔬 SHAP Explanation Summary")
         explainer = shap.Explainer(st.session_state.best_model_obj, st.session_state.X_train)
         shap_values = explainer(st.session_state.X_test[:100])
-        st.subheader("🔬 SHAP Explanation Summary")
         fig, ax = plt.subplots()
         shap.summary_plot(shap_values, st.session_state.X_test[:100], show=False)
         st.pyplot(fig)
@@ -268,6 +239,7 @@ elif st.session_state.stage == "results":
 
     try:
         st.subheader("💡 LIME Explanation (1st test instance)")
+        predict_fn = st.session_state.best_model_obj.predict_proba if hasattr(st.session_state.best_model_obj, "predict_proba") else st.session_state.best_model_obj.predict
         lime_explainer = lime.lime_tabular.LimeTabularExplainer(
             training_data=np.array(st.session_state.X_train),
             feature_names=st.session_state.X_train.columns.tolist(),
@@ -276,7 +248,7 @@ elif st.session_state.stage == "results":
         )
         exp = lime_explainer.explain_instance(
             st.session_state.X_test.iloc[0].values,
-            st.session_state.best_model_obj.predict,
+            predict_fn,
             num_features=10
         )
         fig = exp.as_pyplot_figure()
