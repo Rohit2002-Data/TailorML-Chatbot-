@@ -60,11 +60,11 @@ def get_models(task_type):
     if task_type == 'classification':
         return {
             "Logistic Regression": LogisticRegression(),
-            "Random Forest": RandomForestClassifier(),
-            "Decision Tree": DecisionTreeClassifier(),
+            "RandomForest Classifier": RandomForestClassifier(),
+            "DecisionTree Classifier": DecisionTreeClassifier(),
             "KNN": KNeighborsClassifier(),
             "Naive Bayes": GaussianNB(),
-            "Gradient Boosting": GradientBoostingClassifier(),
+            "Gradient Boosting Classifier ": GradientBoostingClassifier(),
             "AdaBoost Classifier": AdaBoostClassifier()
         }
     else:
