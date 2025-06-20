@@ -17,15 +17,21 @@ from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegress
 from sklearn.metrics import r2_score, classification_report
 from fpdf import FPDF
 import time
-import google.generativeai as genai
+import google.generativeai as genai  # Gemini integration
 
-# ======== Configure Gemini AI ========
-genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # Replace with your API key
-model = genai.GenerativeModel("gemini-2.0-flash")
+# === Gemini Configuration ===
+genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # <-- Replace with your key
 
+@st.cache_resource
+def get_gemini_chat():
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    return model.start_chat(history=[])
+
+chat = get_gemini_chat()
+
+# === Streamlit App Configuration ===
 st.set_page_config(page_title="TailorML", page_icon="🧠", layout="centered")
 
-# ======== Styling ========
 st.markdown("""
 <style>
 .chat-input-container label {display: none;}
@@ -35,7 +41,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ======== Missing Value Handling ========
+# === Missing Value Handling ===
 def handle_missing_values(df):
     for col in df.columns:
         if df[col].isnull().sum() == 0:
@@ -49,7 +55,7 @@ def handle_missing_values(df):
         df[col] = imputer.fit_transform(df[[col]])
     return df
 
-# ======== Model Selector ========
+# === Model Selector ===
 def get_models(task_type):
     if task_type == 'classification':
         return {
@@ -70,14 +76,14 @@ def get_models(task_type):
             "AdaBoost Regressor": AdaBoostRegressor()
         }
 
-# ======== App State ========
+# === App State ===
 st.title("🧠 TailorML: Your Predictive Chat Assistant")
 
 if "stage" not in st.session_state:
     st.session_state.stage = "start"
     st.session_state.df = None
 
-# ======== Stage: Upload ========
+# === Stage: Upload ===
 if st.session_state.stage == "start":
     st.chat_message("ai").write("👋 Hi, I’m **TailorML**! Let’s predict together. Start by uploading your dataset 📂")
     file = st.file_uploader("Upload your CSV dataset", type=["csv"])
@@ -86,9 +92,9 @@ if st.session_state.stage == "start":
         df = handle_missing_values(df)
         st.session_state.df = df
         st.session_state.stage = "uploaded"
-        st.rerun()
+        st.experimental_rerun()
 
-# ======== Stage: Preview ========
+# === Stage: Preview ===
 elif st.session_state.stage == "uploaded":
     st.chat_message("ai").write("👀 Here's a preview of your dataset:")
     st.dataframe(st.session_state.df.head())
@@ -101,9 +107,9 @@ elif st.session_state.stage == "uploaded":
 
     if st.button("✅ All Good, Next"):
         st.session_state.stage = "choose_target"
-        st.rerun()
+        st.experimental_rerun()
 
-# ======== Stage: Choose Target ========
+# === Stage: Choose Target ===
 elif st.session_state.stage == "choose_target":
     st.chat_message("ai").write("🎯 What would you like to predict? Choose a target column:")
     target = st.selectbox("Select the target column", st.session_state.df.columns)
@@ -111,9 +117,9 @@ elif st.session_state.stage == "choose_target":
         st.session_state.target = target
         if st.button("🔍 Confirm Target"):
             st.session_state.stage = "predict"
-            st.rerun()
+            st.experimental_rerun()
 
-# ======== Stage: Predict ========
+# === Stage: Predict ===
 elif st.session_state.stage == "predict":
     st.chat_message("ai").write("⚙️ Training ML models on your data...")
     time.sleep(1)
@@ -179,9 +185,9 @@ elif st.session_state.stage == "predict":
         "X_train": X_train,
         "task_type": task_type
     })
-    st.rerun()
+    st.experimental_rerun()
 
-# ======== Stage: Results ========
+# === Stage: Results ===
 elif st.session_state.stage == "results":
     st.chat_message("ai").write(f"🏅 Best model: **{st.session_state.best_model}** | Score: **{st.session_state.best_score:.2f}**")
     st.chat_message("ai").write(f"🤖 Explanation: {st.session_state.explanation}")
@@ -200,7 +206,6 @@ elif st.session_state.stage == "results":
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-
         pdf.cell(200, 10, txt="TailorML Prediction Report", ln=True, align="C")
         pdf.ln(10)
 
@@ -281,15 +286,11 @@ elif st.session_state.stage == "results":
 
     if st.button("🔁 Try New Dataset"):
         st.session_state.stage = "start"
-        st.rerun()
+        st.experimental_rerun()
 
-# ======== Gemini Chat Assistant ========
-user_input = st.chat_input("💬 Ask TailorML about your results, ML models, or next steps...")
+# === Chat Prompt (Gemini Response) ===
+user_input = st.chat_input("💬 Ask TailorML about your results or next steps...")
 if user_input:
     st.chat_message("user").write(user_input)
-    try:
-        with st.spinner("TailorML is thinking... 🤔"):
-            response = model.generate_content(user_input)
-            st.chat_message("ai").write(response.text)
-    except Exception as e:
-        st.chat_message("ai").write(f"⚠️ Gemini couldn't process your query: {e}")
+    response = chat.send_message(user_input)
+    st.chat_message("ai").write(response.text)
