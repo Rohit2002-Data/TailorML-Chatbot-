@@ -6,3 +6,4 @@ matplotlib
 shap
 lime
 fpdf
+google-generativeai
