@@ -92,13 +92,13 @@ if st.session_state.stage == "start":
         df = handle_missing_values(df)
         st.session_state.df = df
         st.session_state.stage = "uploaded"
-        st.experimental_rerun()
+        st.rerun()
 
 # === Stage: Preview ===
 elif st.session_state.stage == "uploaded":
     st.chat_message("ai").write("👀 Here's a preview of your dataset:")
     st.dataframe(st.session_state.df.head())
-    st.chat_message("ai").write(f"📐 Shape: {st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
+    st.chat_message("ai").write(f"📀 Shape: {st.session_state.df.shape[0]} rows × {st.session_state.df.shape[1]} columns")
 
     missing_percent = (st.session_state.df.isnull().sum() / len(st.session_state.df) * 100).round(2)
     if (missing_percent > 0).any():
@@ -107,7 +107,7 @@ elif st.session_state.stage == "uploaded":
 
     if st.button("✅ All Good, Next"):
         st.session_state.stage = "choose_target"
-        st.experimental_rerun()
+        st.rerun()
 
 # === Stage: Choose Target ===
 elif st.session_state.stage == "choose_target":
@@ -117,7 +117,7 @@ elif st.session_state.stage == "choose_target":
         st.session_state.target = target
         if st.button("🔍 Confirm Target"):
             st.session_state.stage = "predict"
-            st.experimental_rerun()
+            st.rerun()
 
 # === Stage: Predict ===
 elif st.session_state.stage == "predict":
@@ -185,7 +185,7 @@ elif st.session_state.stage == "predict":
         "X_train": X_train,
         "task_type": task_type
     })
-    st.experimental_rerun()
+    st.rerun()
 
 # === Stage: Results ===
 elif st.session_state.stage == "results":
@@ -200,32 +200,7 @@ elif st.session_state.stage == "results":
     df_preds['Predicted'] = st.session_state.y_pred
 
     csv = df_preds.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Predictions", csv, "predictions.csv", "text/csv")
-
-    def generate_pdf_report(df, model_name, score, task_type, shap_fig=None, lime_fig=None, user_notes=None, lime_explanations=[]):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="TailorML Prediction Report", ln=True, align="C")
-        pdf.ln(10)
-
-        pdf.cell(200, 10, txt=f"Best Model: {model_name}", ln=True)
-        pdf.cell(200, 10, txt=f"Model Score: {score:.4f}", ln=True)
-        pdf.cell(200, 10, txt=f"Task Type: {task_type.title()}", ln=True)
-        pdf.ln(10)
-
-        pdf.cell(200, 10, txt="Sample Predictions:", ln=True)
-        for i in range(min(10, len(df))):
-            row = df.iloc[i]
-            row_str = ", ".join([f"{col}: {val}" for col, val in row.items()])
-            pdf.multi_cell(0, 10, txt=row_str)
-
-        pdf.output("TailorML_Report.pdf")
-
-    if st.button("📄 Export PDF Report"):
-        generate_pdf_report(df_preds, st.session_state.best_model, st.session_state.best_score, st.session_state.task_type)
-        with open("TailorML_Report.pdf", "rb") as f:
-            st.download_button("⬇️ Download PDF Report", f, file_name="TailorML_Report.pdf")
+    st.download_button("📅 Download Predictions", csv, "predictions.csv", "text/csv")
 
     try:
         st.subheader("🔬 SHAP Explanation Summary")
@@ -258,7 +233,7 @@ elif st.session_state.stage == "results":
 
     if st.button("🔁 Try New Dataset"):
         st.session_state.stage = "start"
-        st.experimental_rerun()
+        st.rerun()
 
 # === Chat Prompt (Gemini Response) ===
 user_input = st.chat_input("💬 Ask TailorML about your results or next steps...")
