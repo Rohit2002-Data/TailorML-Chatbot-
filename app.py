@@ -17,6 +17,11 @@ from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegress
 from sklearn.metrics import r2_score, classification_report
 from fpdf import FPDF
 import time
+import google.generativeai as genai
+
+# ======== Configure Gemini AI ========
+genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # Replace with your API key
+model = genai.GenerativeModel("gemini-2.0-flash")
 
 st.set_page_config(page_title="TailorML", page_icon="🧠", layout="centered")
 
@@ -278,9 +283,15 @@ elif st.session_state.stage == "results":
         st.session_state.stage = "start"
         st.rerun()
 
-# ======== Chat Prompt (Optional) ========
-user_input = st.chat_input("💬 Ask TailorML about your results or next steps...")
+# ======== Gemini Chat Assistant ========
+user_input = st.chat_input("💬 Ask TailorML about your results, ML models, or next steps...")
 if user_input:
     st.chat_message("user").write(user_input)
-    st.chat_message("ai").write("I'm still learning to chat back! But I'm happy to guide you through another ML task 🚀")
+    try:
+        with st.spinner("TailorML is thinking... 🤔"):
+            response = model.generate_content(user_input)
+            st.chat_message("ai").write(response.text)
+    except Exception as e:
+        st.chat_message("ai").write(f"⚠️ Gemini couldn't process your query: {e}")
+
   
