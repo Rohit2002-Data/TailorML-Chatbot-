@@ -20,7 +20,7 @@ import time
 import google.generativeai as genai  # Gemini integration
 
 # === Gemini Configuration ===
-genai.configure(api_key="YOUR_GEMINI_API_KEY")  # Replace with your Gemini API key
+genai.configure(api_key="AIzaSyBaMMT4YLqzDXIzF12W0CaqCe-HRl0V2jA")  # Replace with your Gemini API key
 
 @st.cache_resource
 def get_gemini_chat():
